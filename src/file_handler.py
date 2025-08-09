@@ -1,7 +1,7 @@
 import os
 import datetime
 import sqlite3
-import database
+from . import database
 
 def find_inactive_files(directory, days_inactive):
     inactive_files = []
@@ -20,8 +20,8 @@ def find_inactive_files(directory, days_inactive):
     return inactive_files
 
 def archive_file(db_conn, file_path):
-    source = "../test/" + file_path
-    destination = "../__ARCHIVE__/" + file_path
+    source = "test/" + file_path
+    destination = "__ARCHIVE__/" + file_path
     try:
         os.rename(source, destination)
         print("The File was successfully archived")
@@ -31,10 +31,10 @@ def archive_file(db_conn, file_path):
 def purge_archived_files(db_conn, days_archived):
     files_to_del = []
 
-    content = os.listdir("../__ARCHIVE__/")
+    content = os.listdir("__ARCHIVE__/")
 
     for file in content:
-        file_path = "../__ARCHIVE__/" + file
+        file_path = "__ARCHIVE__/" + file
         access_time = os.path.getatime(file_path)
         last_access_time = datetime.datetime.fromtimestamp(access_time)
         today = datetime.datetime.now()
@@ -45,8 +45,8 @@ def purge_archived_files(db_conn, days_archived):
 
 def restore_archived_file(db_conn, file_id):
     file = database.get_file_by_id(db_conn, file_id)
-    destination = "../test/" + file[1]
-    source = "../__ARCHIVE__/" + file[1]
+    destination = "test/" + file[1]
+    source = "__ARCHIVE__/" + file[1]
     try:
         os.rename(source, destination)
         stat_info = os.stat(destination)
