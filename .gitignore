@@ -209,3 +209,4 @@ __marimo__/
 #Project files and directories
 __ARCHIVE__/
 test_data/
+*.db
