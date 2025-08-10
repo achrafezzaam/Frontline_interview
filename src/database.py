@@ -1,5 +1,6 @@
 import sqlite3
 import logging
+from datetime import datetime
 
 # Configure basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -73,10 +74,19 @@ class DatabaseHandler:
             return None
 
     def update_file_status(self, file_id, new_status):
-        """Updates the status of an existing file record."""
-        query = "UPDATE archive SET status = ? WHERE id = ?"
+        """
+        Updates the status of an existing file record.
+        Also updates the archive date accordingly.
+        """
+        params = (new_status, file_id)
+        if new_status == 'archived':
+            query = "UPDATE archive SET status = ?, date_archived = ? WHERE id = ?"
+            params = (new_status, datetime.now().isoformat(), file_id)
+        else: # For restoring, we clear the archive date
+            query = "UPDATE archive SET status = ?, date_archived = NULL WHERE id = ?"
+        
         try:
-            self.cursor.execute(query, (new_status, file_id))
+            self.cursor.execute(query, params)
             self.conn.commit()
             logging.info(f"Updated status for file ID {file_id} to '{new_status}'")
         except sqlite3.Error as e:
@@ -100,6 +110,16 @@ class DatabaseHandler:
             return self.cursor.fetchone()
         except sqlite3.Error as e:
             logging.error(f"Failed to get file by ID {file_id}: {e}")
+            return None
+            
+    def get_file_by_path(self, file_path):
+        """Retrieves a single record by its file path. (NEW)"""
+        query = "SELECT * FROM archive WHERE file_path = ?"
+        try:
+            self.cursor.execute(query, (file_path,))
+            return self.cursor.fetchone()
+        except sqlite3.Error as e:
+            logging.error(f"Failed to get file by path {file_path}: {e}")
             return None
 
     def remove_file_record(self, file_id):

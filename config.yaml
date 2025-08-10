@@ -16,7 +16,7 @@ archive_directory: "./__ARCHIVE__"
 
 # --- Time Thresholds (in days) ---
 # Number of days of inactivity before a file is considered for archiving.
-days_until_archive: 30
+days_until_archive: 3
 
 # Number of days a file stays in the archive before being deleted.
-days_until_delete: 60
+days_until_delete: 6
