@@ -1,0 +1,22 @@
+# Configuration for the File Archiver application
+
+# --- Database and Logging ---
+database_name: "file_archiver.db"
+log_file: "activity.log"
+
+# --- Directories ---
+# List of directories to scan for inactive files.
+# Use paths relative to the project root or absolute paths.
+scan_directories:
+  - "./test_data/documents"
+  - "./test_data/images"
+
+# The central directory where inactive files will be moved.
+archive_directory: "./__ARCHIVE__"
+
+# --- Time Thresholds (in days) ---
+# Number of days of inactivity before a file is considered for archiving.
+days_until_archive: 30
+
+# Number of days a file stays in the archive before being deleted.
+days_until_delete: 60

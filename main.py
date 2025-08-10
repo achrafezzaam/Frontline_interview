@@ -1,73 +1,93 @@
-#!/usr/bin/env python3
-
 import os
-import sqlite3
-from src import file_handler as fh
-from src import database
+import yaml
+import logging
+from src.database import DatabaseHandler
+import src.file_handler as fh
+import src.logger as logger
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-repo = os.path.join(basedir, "test/")
-archive = os.path.join(basedir, "__ARCHIVE__/")
-db = os.path.join(basedir, "src/my_database.db")
+def load_config():
+    """Loads the configuration from config.yaml."""
+    # The __file__ trick gets the directory of the currently running script
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    config_path = os.path.join(basedir, 'config.yaml')
+    try:
+        with open(config_path, 'r') as f:
+            return yaml.safe_load(f)
+    except FileNotFoundError:
+        print("Error: config.yaml not found. Please create it.")
+        return None
+    except Exception as e:
+        print(f"Error loading config.yaml: {e}")
+        return None
 
-def scan(directory, dry_run=False):
-    files = fh.find_inactive_files(directory, 2)
-    if dry_run:
-        for file in files:
-            fh.archive_file("", file)
+def main():
+    """Main function to run the file archiver application."""
+    config = load_config()
+    if not config:
+        return
 
-def purge(dry_run):
-    if dry_run:
-        fh.purge_archived_files("", 2)
+    # Set up logging
+    logger.setup_logger(config['log_file'])
+    logging.info("Application starting...")
 
-def list():
-    conn = sqlite3.connect(db)
-    files = database.get_files_by_status(conn, 'archived')
-    print("-"*40)
-    for file in files:
-        print(f"{file[1]}\t\tid: {file[0]}")
-        print("-"*40)
+    # Instantiate and connect to the database
+    db_handler = DatabaseHandler(config['database_name'])
+    
+    try:
+        if not db_handler.connect():
+            logging.critical("Could not connect to the database. Exiting.")
+            return
+        
+        # Ensure the database table is set up
+        db_handler.setup_table()
 
-def restore(file_id):
-    conn = sqlite3.connect(db)
-    fh.restore_archived_file(conn, file_id)
+        # --- Main Application Loop ---
+        exit_loop = False
+        while not exit_loop:
+            print("\n--- File Archiver Menu ---")
+            print("1. Scan for and archive inactive files")
+            print("2. Purge old archived files (delete them)")
+            print("3. List currently archived files")
+            print("4. Restore an archived file")
+            print("5. Force delete an archived file")
+            print("0. Exit")
+            
+            entry = input("==> ")
+            
+            if entry == "1":
+                logging.info("Starting file scan and archive process...")
+                fh.scan_and_archive_files(db_handler, config)
+            elif entry == "2":
+                logging.info("Starting purge process for old files...")
+                fh.purge_old_files(db_handler, config)
+            elif entry == "3":
+                files = db_handler.get_files_by_status('archived')
+                print("\n--- Archived Files ---")
+                if not files:
+                    print("No files are currently in the archive.")
+                else:
+                    for file in files:
+                        # file format: (id, file_path, status, date_archived)
+                        print(f"  ID: {file[0]} | Path: {file[1]} | Archived on: {file[3]}")
+                print("----------------------")
+            elif entry == "4":
+                file_id = input("Enter the ID of the file to restore: ")
+                fh.restore_file(db_handler, config, file_id)
+            elif entry == "5":
+                file_id = input("Enter the ID of the file to delete: ")
+                fh.delete_archived_file(db_handler, config, file_id)
+            elif entry == "0":
+                exit_loop = True
+            else:
+                print("Invalid entry. Please try again.")
 
-def delete(file_id):
-    conn = sqlite3.connect(db)
-    file = database.get_file_by_id(conn, file_id)
-    os.remove(os.path.join(archive, file[1]))
-    database.remove_file_record(conn, file_id)
+    except Exception as e:
+        logging.error(f"An unexpected error occurred in the main loop: {e}", exc_info=True)
+    finally:
+        # This ensures the database connection is always closed
+        db_handler.close()
+        logging.info("Application finished.")
 
 
-exit_loop = True
-while exit_loop:
-    print("Welcome to the file manager:")
-    print("- To get a list of all inactive files enter 1")
-    print("- To archive all inactive files enter 2")
-    print("- To delete the archived files enter 3")
-    print("- To list all the archived files enter 4")
-    print("- To restore an archived file enter 5")
-    print("- To delete an archived file enter 6")
-    print("- To quit the program enter 0")
-    entry = input("==> ")
-    match entry:
-        case "1":
-            scan(repo)
-        case "2":
-            scan(repo, True)
-        case "3":
-            purge(True)
-        case "4":
-            list()
-        case "5":
-            file_id = input("Choose an archived file to restore: ")
-            restore(file_id)
-        case "6":
-            file_id = input("Choose an archived file to delete: ")
-            delete(file_id)
-        case "0":
-            exit_loop = False
-        case _:
-            print("-"*40)
-            print("Wrong entry. Please try again.")
-            print("-"*40)
+if __name__ == "__main__":
+    main()
