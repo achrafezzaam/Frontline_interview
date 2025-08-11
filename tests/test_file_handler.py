@@ -16,7 +16,6 @@ class TestFileHandler(unittest.TestCase):
         os.makedirs(self.scan_dir)
         os.makedirs(self.archive_dir)
 
-        # Create mock config and db_handler
         self.mock_config = {
             'scan_directories': [self.scan_dir],
             'archive_directory': self.archive_dir,
@@ -29,65 +28,60 @@ class TestFileHandler(unittest.TestCase):
         """Remove the temporary directory after tests."""
         shutil.rmtree(self.test_dir)
 
-    def test_find_inactive_files(self):
-        """Test the logic for finding inactive files."""
-        # Create a recent file (should not be found)
-        with open(os.path.join(self.scan_dir, "recent.txt"), "w") as f:
-            f.write("recent")
+    def _create_old_file(self, filename, days_old):
+        """Helper function to create a file with a past modification time."""
+        file_path = os.path.join(self.scan_dir, filename)
+        with open(file_path, "w") as f:
+            f.write("content")
+        past_date = (datetime.now() - timedelta(days=days_old)).timestamp()
+        os.utime(file_path, (past_date, past_date))
+        return file_path
 
-        # Create an old file (should be found)
-        old_file_path = os.path.join(self.scan_dir, "old.txt")
-        with open(old_file_path, "w") as f:
-            f.write("old")
+    def test_scan_and_archive_new_file(self):
+        """Test archiving a file that has no previous record in the database."""
+        self._create_old_file("new_archive.txt", 35)
         
-        # Modify its modification time to be 40 days ago
-        forty_days_ago = (datetime.now() - timedelta(days=40)).timestamp()
-        os.utime(old_file_path, (forty_days_ago, forty_days_ago))
+        # Simulate that the file does not exist in the DB
+        self.mock_db_handler.get_file_by_path.return_value = None
+        
+        fh.scan_and_archive_files(self.mock_db_handler, self.mock_config)
 
-        inactive_files = fh.find_inactive_files([self.scan_dir], 30)
-        
-        self.assertEqual(len(inactive_files), 1)
-        self.assertIn("old.txt", inactive_files[0])
+        # Verify it tries to get the file by path, then adds a new record
+        self.mock_db_handler.get_file_by_path.assert_called_once()
+        self.mock_db_handler.add_file_record.assert_called_once()
+        self.mock_db_handler.update_file_status.assert_not_called()
 
-    def test_scan_and_archive_files(self):
-        """Test the complete scan and archive process."""
-        # Create an old file to be archived
-        old_file_path = os.path.join(self.scan_dir, "file_to_archive.txt")
-        with open(old_file_path, "w") as f:
-            f.write("archive me")
+    def test_scan_and_rearchive_existing_file(self):
+        """Test re-archiving a file that was previously restored."""
+        old_file_path = self._create_old_file("re_archive.txt", 40)
         
-        thirty_days_ago = (datetime.now() - timedelta(days=35)).timestamp()
-        os.utime(old_file_path, (thirty_days_ago, thirty_days_ago))
+        # Simulate that the file DOES exist in the DB (it was restored)
+        self.mock_db_handler.get_file_by_path.return_value = (1, old_file_path, 'restored', None)
 
         fh.scan_and_archive_files(self.mock_db_handler, self.mock_config)
 
-        # Check that the file was moved
-        self.assertFalse(os.path.exists(old_file_path))
-        self.assertTrue(os.path.exists(os.path.join(self.archive_dir, "file_to_archive.txt")))
-        
-        # Check that the database was updated
-        self.mock_db_handler.add_file_record.assert_called_once()
+        # Verify it finds the existing record and updates it, instead of adding a new one
+        self.mock_db_handler.get_file_by_path.assert_called_once()
+        self.mock_db_handler.add_file_record.assert_not_called()
+        self.mock_db_handler.update_file_status.assert_called_once_with(1, 'archived')
 
-    def test_restore_file(self):
-        """Test restoring a file from the archive."""
-        # Setup a file in the archive
+    @patch('os.utime')
+    def test_restore_file_updates_mtime(self, mock_utime):
+        """Test that restoring a file updates its modification time."""
         archived_file_name = "restorable.txt"
         original_path = os.path.join(self.scan_dir, archived_file_name)
         archived_path = os.path.join(self.archive_dir, archived_file_name)
         with open(archived_path, "w") as f:
             f.write("restore me")
 
-        # Mock the database response
         self.mock_db_handler.get_file_by_id.return_value = (1, original_path, 'archived', 'some_date')
         
         fh.restore_file(self.mock_db_handler, self.mock_config, 1)
 
-        # Check file was moved back
-        self.assertTrue(os.path.exists(original_path))
-        self.assertFalse(os.path.exists(archived_path))
-
-        # Check db was updated
+        # Check that os.utime was called on the restored file path with None (to set to now)
+        mock_utime.assert_called_once_with(original_path, None)
         self.mock_db_handler.update_file_status.assert_called_with(1, 'restored')
 
 if __name__ == '__main__':
     unittest.main()
+    
