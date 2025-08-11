@@ -17,21 +17,23 @@ The application is configurable, allowing you to specify which directories to wa
 
 The project is organized into source code, tests, and configuration files for clarity and maintainability.
 
+```
 file-archiver/
-├── src/
-│   ├── __init__.py         # Makes 'src' a Python package
-│   ├── database.py         # Handles all database interactions
-│   ├── file_handler.py     # Core logic for file operations
-│   └── logger.py           # Configures the application logger
-├── tests/
-│   ├── __init__.py         # Makes 'tests' a Python package
-│   ├── test_database.py    # Unit tests for the database
-│   └── ...                 # Other test files
-├── .gitignore              # Specifies files for Git to ignore
-├── config.yaml             # Main configuration file
-├── main.py                 # Main entry point for the application
-├── populate_database.py    # Optional script to pre-load the DB
-└── requirements.txt        # Project dependencies
+|- src/
+| |- __init__.py         # Makes 'src' a Python package
+| |- database.py         # Handles all database interactions
+| |- file_handler.py     # Core logic for file operations
+| |- logger.py           # Configures the application logger
+|-tests/
+| |- __init__.py         # Makes 'tests' a Python package
+| |- test_database.py    # Unit tests for the database
+| |- ...                 # Other test files
+|- .gitignore              # Specifies files for Git to ignore
+|- config.yaml             # Main configuration file
+|- main.py                 # Main entry point for the application
+|- populate_database.py    # Optional script to pre-load the DB
+|- requirements.txt        # Project dependencies
+```
 
 ## Setup and Installation
 
