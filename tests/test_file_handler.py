@@ -19,8 +19,8 @@ class TestFileHandler(unittest.TestCase):
         self.mock_config = {
             'scan_directories': [self.scan_dir],
             'archive_directory': self.archive_dir,
-            'days_until_archive': 30,
-            'days_until_delete': 60
+            'days_until_archive': 3,
+            'days_until_delete': 6
         }
         self.mock_db_handler = MagicMock()
 
